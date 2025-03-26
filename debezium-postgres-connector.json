@@ -1,0 +1,31 @@
+{
+    "name": "football-postgres-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "database.hostname": "postgres",  
+      "database.port": "5432",
+      "database.user": "postgres",
+      "database.password": "postgres",  
+      "database.dbname": "football_db",  
+      "database.server.name": "football",
+      "topic.prefix": "football",
+      "table.include.list": "public.countries,public.teams,public.players,public.leagues,public.fixtures,public.coaches,public.venues,public.seasons,public.standings",
+      "plugin.name": "pgoutput",
+      "schema.include.list": "public",
+      "publication.name": "football_publication",
+      "publication.autocreate.mode": "filtered",
+      "slot.name": "football_replication_slot",
+      "slot.drop.on.stop": "false",
+      "transforms": "unwrap",
+      "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+      "transforms.unwrap.drop.tombstones": "false",
+      "transforms.unwrap.delete.handling.mode": "rewrite",
+      "transforms.unwrap.add.fields": "op,source.ts_ms,db",
+      "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "key.converter.schemas.enable": "false",
+      "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+      "value.converter.schemas.enable": "false",
+      "heartbeat.interval.ms": "5000",
+      "tombstones.on.delete": "true"
+    }
+  }
