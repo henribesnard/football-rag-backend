@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 
 from app.db.postgres.connection import get_db_session
+from app.db.postgres.models import get_model_by_entity_type
 from app.embedding.vectorize import get_embedding_for_entity
 from .schema_converter import model_to_vector_payload
 from .collections import get_collection_name
@@ -34,23 +35,21 @@ def get_updated_entities(
     if not since_timestamp:
         since_timestamp = datetime.now() - timedelta(hours=24)
     
-    # Table correspondant au type d'entité
-    table_name = get_collection_name(entity_type)
-    
-    # Requête SQL pour récupérer les entités mises à jour
-    query = f"""
-        SELECT id, update_at
-        FROM {table_name}
-        WHERE update_at >= %s
-        ORDER BY update_at DESC
-        LIMIT %s
-    """
+    # Récupérer la classe de modèle correspondant au type d'entité
+    model_class = get_model_by_entity_type(entity_type)
+    if not model_class:
+        logger.error(f"Modèle introuvable pour {entity_type}")
+        return []
     
     session = get_db_session()
     try:
-        result = session.execute(query, (since_timestamp, limit))
-        entities = [{"id": row[0], "update_at": row[1]} for row in result]
-        return entities
+        # Utiliser SQLAlchemy pour la requête
+        entities = session.query(model_class.id, model_class.update_at)\
+                         .filter(model_class.update_at >= since_timestamp)\
+                         .order_by(model_class.update_at.desc())\
+                         .limit(limit)\
+                         .all()
+        return [{"id": entity.id, "update_at": entity.update_at} for entity in entities]
     except Exception as e:
         logger.error(f"Erreur lors de la récupération des entités mises à jour pour {entity_type}: {str(e)}")
         return []
@@ -71,15 +70,8 @@ async def update_entity_vectors(
     Returns:
         True si la mise à jour est réussie, False sinon
     """
-    from app.models.database import Base, Session
-    
     # Récupérer la classe de modèle correspondant au type d'entité
-    model_classes = {
-        cls.__tablename__: cls for cls in Base.__subclasses__()
-    }
-    
-    entity_table = get_collection_name(entity_type)
-    model_class = model_classes.get(entity_table)
+    model_class = get_model_by_entity_type(entity_type)
     
     if not model_class:
         logger.error(f"Classe de modèle introuvable pour {entity_type}")
@@ -88,7 +80,7 @@ async def update_entity_vectors(
     collection_name = get_collection_name(entity_type)
     
     # Récupérer les entités à mettre à jour
-    session = Session()
+    session = get_db_session()
     try:
         entities = session.query(model_class).filter(model_class.id.in_(entity_ids)).all()
         

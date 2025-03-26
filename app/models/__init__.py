@@ -3,12 +3,12 @@ from app.models.base import Base
 from app.models.core.country import Country
 from app.models.core.venue import Venue
 from app.models.team.team import Team
-from app.models.team.player import Player, PlayerTransfer, PlayerTeam
+from app.models.team.player import Player, PlayerTransfer, PlayerTeam, PlayerInjury
 from app.models.team.coach import Coach, CoachCareer
 from app.models.competition.league import League, Season
 from app.models.competition.standing import Standing
 from app.models.competition.stats import TeamStatistics
-from app.models.fixture.fixture import Fixture, FixtureStatus
+from app.models.fixture.fixture import Fixture, FixtureStatus, FixtureScore
 from app.models.fixture.event import FixtureEvent
 from app.models.fixture.statistic import FixtureStatistic, PlayerStatistics
 from app.models.fixture.lineup import FixtureLineup, FixtureLineupPlayer
@@ -42,7 +42,13 @@ ENTITY_MODELS = {
     'player_transfer': PlayerTransfer,
     'player_team': PlayerTeam,
     'fixture_h2h': FixtureH2H,
-    'update_log': UpdateLog
+    'update_log': UpdateLog,
+    'fixture_status': FixtureStatus,
+    'fixture_lineup_player': FixtureLineupPlayer,
+    'player_injury': PlayerInjury,
+    'fixture_coach': FixtureCoach,
+    'fixture_score': FixtureScore,
+    'coach_career': CoachCareer
 }
 
 # Fonction helper pour obtenir un modèle par type d'entité
