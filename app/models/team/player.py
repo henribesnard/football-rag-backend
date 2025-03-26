@@ -2,7 +2,6 @@ from sqlalchemy import Column, Integer, String, Date, SmallInteger, ForeignKey, 
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, TimeStampMixin
-from app.models.constants import PlayerPosition
 
 class Player(Base, TimeStampMixin):
     __tablename__ = 'players'

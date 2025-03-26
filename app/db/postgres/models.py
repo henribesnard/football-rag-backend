@@ -1,9 +1,26 @@
 from app.models import (
-    Country, Venue, League, Team, Season, FixtureStatus, Fixture, FixtureScore,
-    FixtureEvent, FixtureStatistic, FixtureLineup, FixtureLineupPlayer,
-    Player, PlayerStatistics, PlayerInjury, Coach, CoachCareer, Bookmaker,
-    OddsType, OddsValue, Odds, OddsHistory, Standing, FixtureH2H, PlayerTransfer,
-    PlayerTeam, TeamStatistics, UpdateLog
+    # CORE
+    Country, Venue, MediaAsset,
+    
+    # TEAM
+    Team, TeamPlayer, Player, PlayerTransfer, PlayerTeam, PlayerInjury, 
+    Coach, CoachCareer,
+    
+    # COMPETITION
+    League, Season, Standing, TeamStatistics,
+    
+    # FIXTURE
+    Fixture, FixtureStatus, FixtureScore, FixtureEvent, FixtureStatistic, 
+    PlayerStatistics, FixtureLineup, FixtureLineupPlayer, FixtureCoach, FixtureH2H,
+    
+    # BETTING
+    Bookmaker, OddsType, OddsValue, Odds, OddsHistory,
+    
+    # USER
+    User, UserProfile, Role, Permission, RolePermission, UserSession, PasswordReset,
+    
+    # SYSTEM
+    UpdateLog, AppMetrics, PerformanceLog
 )
 
 # Fonction pour convertir un objet modèle en dictionnaire
@@ -22,34 +39,59 @@ def model_to_dict(model_obj):
 
 # Dictionnaire pour mapper les types d'entités aux classes de modèles
 ENTITY_MODEL_MAP = {
+    # CORE
     'country': Country,
     'venue': Venue,
-    'league': League,
+    'media_asset': MediaAsset,
+    
+    # TEAM
     'team': Team,
-    'season': Season,
-    'fixture': Fixture,
-    'fixture_event': FixtureEvent,
-    'fixture_statistic': FixtureStatistic,
+    'team_player': TeamPlayer,
     'player': Player,
-    'player_statistics': PlayerStatistics,
-    'coach': Coach,
-    'coach_career': CoachCareer,
-    'standing': Standing,
-    'team_statistics': TeamStatistics,
     'player_transfer': PlayerTransfer,
     'player_team': PlayerTeam,
-    'fixture_h2h': FixtureH2H,
-    'odds': Odds,
-    'bookmaker': Bookmaker,
-    'update_log': UpdateLog,
+    'player_injury': PlayerInjury,
+    'coach': Coach,
+    'coach_career': CoachCareer,
+    
+    # COMPETITION
+    'league': League,
+    'season': Season,
+    'standing': Standing,
+    'team_statistics': TeamStatistics,
+    
+    # FIXTURE
+    'fixture': Fixture,
+    'fixture_status': FixtureStatus,
+    'fixture_score': FixtureScore,
+    'fixture_event': FixtureEvent,
+    'fixture_statistic': FixtureStatistic,
+    'player_statistics': PlayerStatistics,
     'fixture_lineup': FixtureLineup,
     'fixture_lineup_player': FixtureLineupPlayer,
-    'fixture_score': FixtureScore,
-    'player_injury': PlayerInjury,
+    'fixture_coach': FixtureCoach,
+    'fixture_h2h': FixtureH2H,
+    
+    # BETTING
+    'bookmaker': Bookmaker,
     'odds_type': OddsType,
     'odds_value': OddsValue,
+    'odds': Odds,
     'odds_history': OddsHistory,
-    'fixture_status': FixtureStatus
+    
+    # USER
+    'user': User,
+    'user_profile': UserProfile,
+    'role': Role,
+    'permission': Permission,
+    'role_permission': RolePermission,
+    'user_session': UserSession,
+    'password_reset': PasswordReset,
+    
+    # SYSTEM
+    'update_log': UpdateLog,
+    'app_metrics': AppMetrics,
+    'performance_log': PerformanceLog
 }
 
 def get_model_by_entity_type(entity_type):
