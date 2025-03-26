@@ -1,7 +1,3 @@
-"""
-Base de définition pour les modèles SQLAlchemy.
-Contient la classe Base et les fonctions communes utilisées par les modèles.
-"""
 from typing import Any, Dict, Type, List, Optional, TypeVar, cast
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, Query
@@ -12,10 +8,20 @@ import logging
 # Création de la classe de base pour tous les modèles
 Base = declarative_base()
 
-# TypeVar pour les annotations de type - définition corrigée
+# TypeVar pour les annotations de type
 Model = TypeVar('Model')
 
 logger = logging.getLogger(__name__)
+
+class TimeStampMixin:
+    """
+    Mixin ajoutant des champs de timestamp pour le suivi des modifications.
+    """
+    from sqlalchemy import Column, DateTime, String, func
+    
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    update_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)  # Changé de updated_at à update_at
+    update_by = Column(String(50), default="system")
 
 class ModelOperationsMixin:
     """

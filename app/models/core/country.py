@@ -1,9 +1,9 @@
 from sqlalchemy import Column, Integer, String, Index
 from sqlalchemy.orm import relationship, validates
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimeStampMixin
 
-class Country(Base, TimestampMixin):
+class Country(Base, TimeStampMixin):
     __tablename__ = 'countries'
     
     id = Column(Integer, primary_key=True)

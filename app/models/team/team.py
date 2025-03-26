@@ -1,9 +1,9 @@
 from sqlalchemy import Column, Integer, String, Boolean, SmallInteger, ForeignKey, CheckConstraint, Index
 from sqlalchemy.orm import relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimeStampMixin
 
-class Team(Base, TimestampMixin):
+class Team(Base, TimeStampMixin):
     __tablename__ = 'teams'
     
     id = Column(Integer, primary_key=True)
@@ -48,3 +48,32 @@ class Team(Base, TimestampMixin):
     
     def __repr__(self):
         return f"<Team(name='{self.name}')>"
+
+class TeamPlayer(Base, TimeStampMixin):
+    """
+    Effectif actuel d'une équipe
+    """
+    __tablename__ = 'team_players'
+    
+    id = Column(Integer, primary_key=True)
+    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False, index=True)
+    player_id = Column(Integer, ForeignKey('players.id'), nullable=False, index=True)
+    
+    # Informations spécifiques au joueur dans l'équipe
+    position = Column(String(20), index=True)
+    number = Column(SmallInteger, nullable=True)
+    is_active = Column(Boolean, default=True)
+
+    # Relationships
+    team = relationship("Team", back_populates="squad")
+    player = relationship("Player", back_populates="current_squad")
+    
+    # Constraints & Indexes
+    __table_args__ = (
+        Index('ix_team_players_team_position', 'team_id', 'position'),
+        Index('ix_team_players_team_is_active', 'team_id', 'is_active'),
+        Index('ix_team_players_player_is_active', 'player_id', 'is_active'),
+    )
+
+    def __repr__(self):
+        return f"<TeamPlayer(team_id={self.team_id}, player_id={self.player_id}, position='{self.position}')>"

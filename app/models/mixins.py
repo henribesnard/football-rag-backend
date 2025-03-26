@@ -11,7 +11,7 @@ class TimestampMixin:
     Mixin ajoutant des champs de timestamp pour le suivi des modifications.
     """
     created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    update_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
     update_by = Column(String(50), default="system")
 
 class AuditMixin:
@@ -21,7 +21,7 @@ class AuditMixin:
     """
     created_at = Column(DateTime, default=func.now(), nullable=False)
     created_by = Column(String(50), default="system", nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    update_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
     update_by = Column(String(50), default="system")
     is_active = Column(Boolean, default=True, nullable=False)
     is_deleted = Column(Boolean, default=False, nullable=False)
