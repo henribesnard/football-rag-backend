@@ -1,15 +1,7 @@
-from sqlalchemy import Column, Integer, String, Table, ForeignKey, Text, Boolean, Index
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Index
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, TimeStampMixin
-
-# Table d'association entre Role et Permission
-role_permissions = Table(
-    'role_permissions',
-    Base.metadata,
-    Column('role_id', Integer, ForeignKey('roles.id'), primary_key=True),
-    Column('permission_id', Integer, ForeignKey('permissions.id'), primary_key=True)
-)
 
 class Role(Base, TimeStampMixin):
     __tablename__ = 'roles'
@@ -21,7 +13,7 @@ class Role(Base, TimeStampMixin):
     
     # Relationships
     users = relationship("User", secondary="user_roles", back_populates="roles")
-    permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
+    permissions = relationship("Permission", secondary="role_permissions", back_populates="roles")
     
     def __repr__(self):
         return f"<Role(id={self.id}, name='{self.name}')>"
@@ -36,7 +28,7 @@ class Permission(Base, TimeStampMixin):
     category = Column(String(50), nullable=True, index=True)  # Pour regrouper les permissions
     
     # Relationships
-    roles = relationship("Role", secondary=role_permissions, back_populates="permissions")
+    roles = relationship("Role", secondary="role_permissions", back_populates="permissions")
     
     # Indexes
     __table_args__ = (

@@ -27,17 +27,17 @@ class Team(Base, TimeStampMixin):
     # Relationships
     country = relationship("Country", back_populates="teams")
     venue = relationship("Venue", back_populates="teams")
-    players = relationship("Player", back_populates="team")
+    #players = relationship("Player", back_populates="team")
     home_fixtures = relationship("Fixture", foreign_keys="Fixture.home_team_id", back_populates="home_team")
     away_fixtures = relationship("Fixture", foreign_keys="Fixture.away_team_id", back_populates="away_team")
-    current_coach = relationship("Coach", uselist=False, back_populates="team")
-    coach_history = relationship("CoachCareer", back_populates="team")
-    squad = relationship("TeamPlayer", back_populates="team")
-    standings = relationship("Standing", back_populates="team")
-    team_statistics = relationship("TeamStatistics", back_populates="team")
-    transfers_in = relationship("PlayerTransfer", foreign_keys="PlayerTransfer.team_in_id", back_populates="team_in")
-    transfers_out = relationship("PlayerTransfer", foreign_keys="PlayerTransfer.team_out_id", back_populates="team_out")
-    player_history = relationship("PlayerTeam", back_populates="team")
+    #current_coach = relationship("Coach", uselist=False, back_populates="team")
+    #coach_history = relationship("CoachCareer", back_populates="team")
+    #squad = relationship("TeamPlayer", back_populates="team")
+    #standings = relationship("Standing", back_populates="team")
+    #team_statistics = relationship("TeamStatistics", back_populates="team")
+    #transfers_in = relationship("PlayerTransfer", foreign_keys="PlayerTransfer.team_in_id", back_populates="team_in")
+    #transfers_out = relationship("PlayerTransfer", foreign_keys="PlayerTransfer.team_out_id", back_populates="team_out")
+    #player_history = relationship("PlayerTeam", back_populates="team")
     
     # Indexes et validations
     __table_args__ = (
@@ -48,32 +48,3 @@ class Team(Base, TimeStampMixin):
     
     def __repr__(self):
         return f"<Team(name='{self.name}')>"
-
-class TeamPlayer(Base, TimeStampMixin):
-    """
-    Effectif actuel d'une équipe
-    """
-    __tablename__ = 'team_players'
-    
-    id = Column(Integer, primary_key=True)
-    team_id = Column(Integer, ForeignKey('teams.id'), nullable=False, index=True)
-    player_id = Column(Integer, ForeignKey('players.id'), nullable=False, index=True)
-    
-    # Informations spécifiques au joueur dans l'équipe
-    position = Column(String(20), index=True)
-    number = Column(SmallInteger, nullable=True)
-    is_active = Column(Boolean, default=True)
-
-    # Relationships
-    team = relationship("Team", back_populates="squad")
-    player = relationship("Player", back_populates="current_squad")
-    
-    # Constraints & Indexes
-    __table_args__ = (
-        Index('ix_team_players_team_position', 'team_id', 'position'),
-        Index('ix_team_players_team_is_active', 'team_id', 'is_active'),
-        Index('ix_team_players_player_is_active', 'player_id', 'is_active'),
-    )
-
-    def __repr__(self):
-        return f"<TeamPlayer(team_id={self.team_id}, player_id={self.player_id}, position='{self.position}')>"

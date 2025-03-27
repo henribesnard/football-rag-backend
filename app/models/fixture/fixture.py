@@ -53,13 +53,13 @@ class Fixture(Base, TimeStampMixin):
     venue = relationship("Venue", back_populates="fixtures")
     status = relationship("FixtureStatus", back_populates="fixtures")
     scores = relationship("FixtureScore", back_populates="fixture")
-    events = relationship("FixtureEvent", back_populates="fixture")
-    statistics = relationship("FixtureStatistic", back_populates="fixture")
-    player_statistics = relationship("PlayerStatistics", back_populates="fixture")
-    lineups = relationship("FixtureLineup", back_populates="fixture")
-    h2h_references = relationship("FixtureH2H", foreign_keys="FixtureH2H.reference_fixture_id", back_populates="reference_fixture")
-    h2h_related = relationship("FixtureH2H", foreign_keys="FixtureH2H.related_fixture_id", back_populates="related_fixture")
-    injuries = relationship("PlayerInjury", back_populates="fixture")
+    #events = relationship("FixtureEvent", back_populates="fixture")
+    #statistics = relationship("FixtureStatistic", back_populates="fixture")
+    #player_statistics = relationship("PlayerStatistics", back_populates="fixture")
+    #lineups = relationship("FixtureLineup", back_populates="fixture")
+    #h2h_references = relationship("FixtureH2H", foreign_keys="FixtureH2H.reference_fixture_id", back_populates="reference_fixture")
+    #h2h_related = relationship("FixtureH2H", foreign_keys="FixtureH2H.related_fixture_id", back_populates="related_fixture")
+    #injuries = relationship("PlayerInjury", back_populates="fixture")
     
     # Indexes & Constraints
     __table_args__ = (

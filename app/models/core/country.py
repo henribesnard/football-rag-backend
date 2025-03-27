@@ -16,8 +16,8 @@ class Country(Base, TimeStampMixin):
     venues = relationship("Venue", back_populates="country")
     leagues = relationship("League", back_populates="country")
     teams = relationship("Team", back_populates="country")
-    players = relationship("Player", back_populates="nationality")
-    coaches = relationship("Coach", back_populates="nationality")
+    #players = relationship("Player", back_populates="nationality")
+    #coaches = relationship("Coach", back_populates="nationality")
     
     @validates('code')
     def validate_code(self, key, code):
