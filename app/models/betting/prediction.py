@@ -1,4 +1,3 @@
-# app/models/betting/prediction.py
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean, Text, JSON, Index
 from sqlalchemy.orm import relationship
 

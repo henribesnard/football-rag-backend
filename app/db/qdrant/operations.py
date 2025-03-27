@@ -1,5 +1,6 @@
 import logging
 from typing import Dict, List, Optional, Union, Any
+import datetime
 
 import numpy as np
 from qdrant_client.http import models as rest
@@ -9,6 +10,9 @@ from .client import get_qdrant_client
 from .collections import get_collection_name
 
 logger = logging.getLogger(__name__)
+
+# Dimension d'embedding par défaut (à remplacer par settings.EMBEDDING_DIM lorsque disponible)
+DEFAULT_EMBEDDING_DIM = 1024
 
 def search_collection(
     collection_name: str,
@@ -185,3 +189,166 @@ def delete_vectors(
     except Exception as e:
         logger.error(f"Erreur lors de la suppression de vecteurs dans la collection {collection_name}: {str(e)}")
         return False
+    
+def search_fixtures_by_date(date: datetime.date, limit: int = 20) -> List[Dict]:
+    """
+    Recherche les matchs pour une date spécifique.
+    
+    Args:
+        date: Date des matchs à rechercher
+        limit: Nombre maximum de résultats
+    
+    Returns:
+        Liste des matchs pour cette date
+    """
+    collection_name = "fixtures"
+    
+    # Convertir la date en timestamps pour la recherche
+    start_of_day = datetime.datetime.combine(date, datetime.time.min).isoformat()
+    end_of_day = datetime.datetime.combine(date, datetime.time.max).isoformat()
+    
+    # Filtrer par date
+    filter_conditions = {
+        "date": {
+            "gte": start_of_day,
+            "lte": end_of_day
+        }
+    }
+    
+    # Générer un vecteur aléatoire pour une recherche par filtres uniquement
+    random_vector = np.zeros(DEFAULT_EMBEDDING_DIM).tolist()
+    
+    try:
+        results = search_collection(
+            collection_name=collection_name,
+            query_vector=random_vector,
+            filter_conditions=filter_conditions,
+            limit=limit,
+            with_payload=True,
+            score_threshold=0  # Pas de seuil pour les recherches par filtres
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Erreur lors de la recherche des matchs pour la date {date}: {str(e)}")
+        return []
+
+def get_fixture_odds(fixture_id: int) -> List[Dict]:
+    """
+    Récupère les cotes pour un match spécifique.
+    
+    Args:
+        fixture_id: ID du match
+    
+    Returns:
+        Liste des cotes disponibles pour ce match
+    """
+    collection_name = "odds"
+    
+    # Filtrer par fixture_id
+    filter_conditions = {
+        "fixture_id": fixture_id
+    }
+    
+    # Générer un vecteur aléatoire pour une recherche par filtres uniquement
+    random_vector = np.zeros(DEFAULT_EMBEDDING_DIM).tolist()
+    
+    try:
+        results = search_collection(
+            collection_name=collection_name,
+            query_vector=random_vector,
+            filter_conditions=filter_conditions,
+            limit=100,  # Récupérer toutes les cotes pertinentes
+            with_payload=True,
+            score_threshold=0  # Pas de seuil pour les recherches par filtres
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des cotes pour le match {fixture_id}: {str(e)}")
+        return []
+
+def get_fixture_prediction(fixture_id: int) -> Optional[Dict]:
+    """
+    Récupère la prédiction pour un match spécifique.
+    
+    Args:
+        fixture_id: ID du match
+    
+    Returns:
+        Prédiction pour ce match ou None si non trouvée
+    """
+    collection_name = "predictions"
+    
+    # Filtrer par fixture_id
+    filter_conditions = {
+        "fixture_id": fixture_id
+    }
+    
+    # Générer un vecteur aléatoire pour une recherche par filtres uniquement
+    random_vector = np.zeros(DEFAULT_EMBEDDING_DIM).tolist()
+    
+    try:
+        results = search_collection(
+            collection_name=collection_name,
+            query_vector=random_vector,
+            filter_conditions=filter_conditions,
+            limit=1,
+            with_payload=True,
+            score_threshold=0  # Pas de seuil pour les recherches par filtres
+        )
+        
+        if results and len(results) > 0:
+            return results[0]
+        return None
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération de la prédiction pour le match {fixture_id}: {str(e)}")
+        return None
+
+def search_team_fixtures(team_id: int, upcoming: bool = True, limit: int = 10) -> List[Dict]:
+    """
+    Recherche les matchs d'une équipe.
+    
+    Args:
+        team_id: ID de l'équipe
+        upcoming: Si True, recherche les matchs à venir, sinon les matchs passés
+        limit: Nombre maximum de résultats
+    
+    Returns:
+        Liste des matchs pour cette équipe
+    """
+    collection_name = "fixtures"
+    
+    # Filtrer par équipe (domicile ou extérieur)
+    team_filter = {
+        "$or": [
+            {"home_team_id": team_id},
+            {"away_team_id": team_id}
+        ]
+    }
+    
+    # Ajouter la condition de date
+    now = datetime.datetime.now().isoformat()
+    if upcoming:
+        date_condition = {"date": {"gte": now}}
+    else:
+        date_condition = {"date": {"lt": now}}
+    
+    filter_conditions = {
+        "$and": [team_filter, date_condition]
+    }
+    
+    # Générer un vecteur aléatoire pour une recherche par filtres uniquement
+    random_vector = np.zeros(DEFAULT_EMBEDDING_DIM).tolist()
+    
+    try:
+        results = search_collection(
+            collection_name=collection_name,
+            query_vector=random_vector,
+            filter_conditions=filter_conditions,
+            limit=limit,
+            with_payload=True,
+            score_threshold=0  # Pas de seuil pour les recherches par filtres
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Erreur lors de la recherche des matchs pour l'équipe {team_id}: {str(e)}")
+        return []

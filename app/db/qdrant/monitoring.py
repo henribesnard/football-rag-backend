@@ -1,4 +1,3 @@
-# app/db/qdrant/monitoring.py
 """
 Utilitaires pour surveiller la santé et les performances de Qdrant.
 """

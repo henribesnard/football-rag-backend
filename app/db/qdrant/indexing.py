@@ -1,4 +1,3 @@
-# app/db/qdrant/indexing.py
 """
 Gestion des index de payload pour optimiser les requêtes de filtrage dans Qdrant.
 """

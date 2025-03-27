@@ -8,8 +8,8 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 # Définition des collections pour correspondre aux modèles Django
+
 COLLECTIONS = {
-    # Collection des pays
     "countries": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
@@ -24,7 +24,6 @@ COLLECTIONS = {
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     },
-    # Collection des stades
     "venues": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
@@ -41,7 +40,6 @@ COLLECTIONS = {
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     },
-    # Collection des ligues
     "leagues": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
@@ -57,7 +55,23 @@ COLLECTIONS = {
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     },
-    # Collection des équipes
+    "seasons": {
+        "vectors_config": rest.VectorParams(
+            size=settings.EMBEDDING_DIM,
+            distance=rest.Distance.COSINE
+        ),
+        "description": "Informations sur les saisons des compétitions",
+        "payload_schema": {
+            "id": rest.PayloadSchemaType.INTEGER,
+            "external_id": rest.PayloadSchemaType.INTEGER,
+            "league_id": rest.PayloadSchemaType.INTEGER,
+            "year": rest.PayloadSchemaType.INTEGER,
+            "start_date": rest.PayloadSchemaType.DATETIME,
+            "end_date": rest.PayloadSchemaType.DATETIME,
+            "is_current": rest.PayloadSchemaType.BOOLEAN,
+            "update_at": rest.PayloadSchemaType.DATETIME
+        }
+    },
     "teams": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
@@ -77,25 +91,6 @@ COLLECTIONS = {
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     },
-    # Collection des saisons
-    "seasons": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Informations sur les saisons des compétitions",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "external_id": rest.PayloadSchemaType.INTEGER,
-            "league_id": rest.PayloadSchemaType.INTEGER,
-            "year": rest.PayloadSchemaType.INTEGER,
-            "start_date": rest.PayloadSchemaType.DATETIME,
-            "end_date": rest.PayloadSchemaType.DATETIME,
-            "is_current": rest.PayloadSchemaType.BOOLEAN,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des matchs
     "fixtures": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
@@ -119,105 +114,6 @@ COLLECTIONS = {
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     },
-    # Collection des événements de match
-    "fixture_events": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Événements survenus pendant les matchs",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "fixture_id": rest.PayloadSchemaType.INTEGER,
-            "time_elapsed": rest.PayloadSchemaType.INTEGER,
-            "event_type": rest.PayloadSchemaType.KEYWORD,
-            "player_id": rest.PayloadSchemaType.INTEGER,
-            "assist_id": rest.PayloadSchemaType.INTEGER,
-            "team_id": rest.PayloadSchemaType.INTEGER,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des joueurs
-    "players": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Informations sur les joueurs",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "external_id": rest.PayloadSchemaType.INTEGER,
-            "name": rest.PayloadSchemaType.KEYWORD,
-            "firstname": rest.PayloadSchemaType.KEYWORD,
-            "lastname": rest.PayloadSchemaType.KEYWORD,
-            "birth_date": rest.PayloadSchemaType.DATETIME,
-            "nationality_id": rest.PayloadSchemaType.INTEGER,
-            "height": rest.PayloadSchemaType.INTEGER,
-            "weight": rest.PayloadSchemaType.INTEGER,
-            "team_id": rest.PayloadSchemaType.INTEGER,
-            "position": rest.PayloadSchemaType.KEYWORD,
-            "injured": rest.PayloadSchemaType.BOOLEAN,
-            "season_goals": rest.PayloadSchemaType.INTEGER,
-            "season_assists": rest.PayloadSchemaType.INTEGER,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des statistiques des joueurs
-    "player_statistics": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Statistiques des joueurs par match",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "player_id": rest.PayloadSchemaType.INTEGER,
-            "fixture_id": rest.PayloadSchemaType.INTEGER,
-            "team_id": rest.PayloadSchemaType.INTEGER,
-            "minutes_played": rest.PayloadSchemaType.INTEGER,
-            "goals": rest.PayloadSchemaType.INTEGER,
-            "assists": rest.PayloadSchemaType.INTEGER,
-            "rating": rest.PayloadSchemaType.FLOAT,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des entraîneurs
-    "coaches": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Informations sur les entraîneurs",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "external_id": rest.PayloadSchemaType.INTEGER,
-            "name": rest.PayloadSchemaType.KEYWORD,
-            "nationality_id": rest.PayloadSchemaType.INTEGER,
-            "birth_date": rest.PayloadSchemaType.DATETIME,
-            "team_id": rest.PayloadSchemaType.INTEGER,
-            "career_matches": rest.PayloadSchemaType.INTEGER,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des carrières d'entraîneurs
-    "coach_careers": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Historique de carrière des entraîneurs",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "coach_id": rest.PayloadSchemaType.INTEGER,
-            "team_id": rest.PayloadSchemaType.INTEGER,
-            "role": rest.PayloadSchemaType.KEYWORD,
-            "start_date": rest.PayloadSchemaType.DATETIME,
-            "end_date": rest.PayloadSchemaType.DATETIME,
-            "matches": rest.PayloadSchemaType.INTEGER,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des cotes de paris
     "odds": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
@@ -236,112 +132,36 @@ COLLECTIONS = {
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     },
-    # Collection des classements
-    "standings": {
+    "odds_types": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
             distance=rest.Distance.COSINE
         ),
-        "description": "Classements des équipes par saison",
+        "description": "Types de paris disponibles",
         "payload_schema": {
             "id": rest.PayloadSchemaType.INTEGER,
-            "season_id": rest.PayloadSchemaType.INTEGER,
-            "team_id": rest.PayloadSchemaType.INTEGER,
-            "rank": rest.PayloadSchemaType.INTEGER,
-            "points": rest.PayloadSchemaType.INTEGER,
-            "goals_diff": rest.PayloadSchemaType.INTEGER,
-            "played": rest.PayloadSchemaType.INTEGER,
-            "won": rest.PayloadSchemaType.INTEGER,
-            "drawn": rest.PayloadSchemaType.INTEGER,
-            "lost": rest.PayloadSchemaType.INTEGER,
+            "name": rest.PayloadSchemaType.KEYWORD,
+            "key": rest.PayloadSchemaType.KEYWORD,
+            "description": rest.PayloadSchemaType.TEXT,
+            "category": rest.PayloadSchemaType.KEYWORD,
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     },
-    # Collection des transferts de joueurs
-    "player_transfers": {
+    "predictions": {
         "vectors_config": rest.VectorParams(
             size=settings.EMBEDDING_DIM,
             distance=rest.Distance.COSINE
         ),
-        "description": "Historique des transferts de joueurs",
+        "description": "Prédictions de matchs",
         "payload_schema": {
             "id": rest.PayloadSchemaType.INTEGER,
-            "player_id": rest.PayloadSchemaType.INTEGER,
-            "date": rest.PayloadSchemaType.DATETIME,
-            "type": rest.PayloadSchemaType.KEYWORD,
-            "team_in_id": rest.PayloadSchemaType.INTEGER,
-            "team_out_id": rest.PayloadSchemaType.INTEGER,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des blessures de joueurs
-    "player_injuries": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Historique des blessures de joueurs",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "player_id": rest.PayloadSchemaType.INTEGER,
             "fixture_id": rest.PayloadSchemaType.INTEGER,
-            "type": rest.PayloadSchemaType.KEYWORD,
-            "severity": rest.PayloadSchemaType.KEYWORD,
-            "status": rest.PayloadSchemaType.KEYWORD,
-            "start_date": rest.PayloadSchemaType.DATETIME,
-            "end_date": rest.PayloadSchemaType.DATETIME,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des statistiques d'équipe
-    "team_statistics": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Statistiques des équipes par saison",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "team_id": rest.PayloadSchemaType.INTEGER,
-            "league_id": rest.PayloadSchemaType.INTEGER,
-            "season_id": rest.PayloadSchemaType.INTEGER,
-            "matches_played_total": rest.PayloadSchemaType.INTEGER,
-            "wins_total": rest.PayloadSchemaType.INTEGER,
-            "draws_total": rest.PayloadSchemaType.INTEGER,
-            "losses_total": rest.PayloadSchemaType.INTEGER,
-            "goals_for_total": rest.PayloadSchemaType.INTEGER,
-            "goals_against_total": rest.PayloadSchemaType.INTEGER,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection des confrontations directes
-    "h2h_fixtures": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Confrontations directes entre équipes",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "reference_fixture_id": rest.PayloadSchemaType.INTEGER,
-            "related_fixture_id": rest.PayloadSchemaType.INTEGER,
-            "update_at": rest.PayloadSchemaType.DATETIME
-        }
-    },
-    # Collection de connaissances enrichies
-    "football_knowledge": {
-        "vectors_config": rest.VectorParams(
-            size=settings.EMBEDDING_DIM,
-            distance=rest.Distance.COSINE
-        ),
-        "description": "Articles, analyses et connaissances générales sur le football",
-        "payload_schema": {
-            "id": rest.PayloadSchemaType.INTEGER,
-            "title": rest.PayloadSchemaType.KEYWORD,
-            "content_type": rest.PayloadSchemaType.KEYWORD,
-            "entities": rest.PayloadSchemaType.KEYWORD,  
-            "relevance": rest.PayloadSchemaType.FLOAT,
-            "created_at": rest.PayloadSchemaType.DATETIME,
+            "winner_id": rest.PayloadSchemaType.INTEGER,
+            "winner_name": rest.PayloadSchemaType.KEYWORD,
+            "percent_home": rest.PayloadSchemaType.KEYWORD,
+            "percent_draw": rest.PayloadSchemaType.KEYWORD,
+            "percent_away": rest.PayloadSchemaType.KEYWORD,
+            "advice": rest.PayloadSchemaType.TEXT,
             "update_at": rest.PayloadSchemaType.DATETIME
         }
     }
@@ -359,18 +179,9 @@ def get_collection_name(entity_type: str) -> str:
         'team': 'teams',
         'season': 'seasons',
         'fixture': 'fixtures',
-        'fixture_event': 'fixture_events',
-        'player': 'players',
-        'player_statistic': 'player_statistics',
-        'coach': 'coaches',
-        'coach_career': 'coach_careers',
+        'prediction': 'predictions',
         'odd': 'odds',
-        'standing': 'standings',
-        'player_transfer': 'player_transfers',
-        'player_injury': 'player_injuries',
-        'team_statistic': 'team_statistics',
-        'h2h_fixture': 'h2h_fixtures',
-        'knowledge': 'football_knowledge'
+        'odd_type': 'odds_types'
     }
     
     return mapping.get(entity_type, entity_type)

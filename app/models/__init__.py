@@ -18,6 +18,7 @@ from app.models.fixture.fixture import Fixture, FixtureStatus, FixtureScore
 # BETTING
 from app.models.betting.bookmaker import Bookmaker
 from app.models.betting.odds import OddsType, OddsValue, Odds
+from app.models.betting.prediction import Prediction
 
 
 # USER
@@ -53,6 +54,7 @@ ENTITY_MODELS = {
     'odds_type': OddsType,
     'odds_value': OddsValue,
     'odds': Odds,
+    'prediction': Prediction,
     
     # USER
     'user': User,
