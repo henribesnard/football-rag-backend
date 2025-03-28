@@ -1,16 +1,51 @@
 """
 Service RAG (Retrieval-Augmented Generation) pour répondre aux questions sur le football.
+Version avancée avec intégration LLM et reranking spécifique au football.
 """
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 import asyncio
 import json
+import time
 from datetime import datetime
 
 from app.services.search_service import SearchService
+from app.services.reranking_service import reranking_service
+from app.services.llm_service import llm_service
+from app.services.cache_service import cache_service
 from app.embedding.vectorize import get_embedding_for_text
+from app.monitoring.metrics import metrics, timed
+from app.config import settings
+from app.utils.circuit_breaker import circuit
 
 logger = logging.getLogger(__name__)
+
+# Métriques
+rag_processing_time = metrics.histogram(
+    "rag_processing_time",
+    "Temps de traitement RAG (secondes)",
+    buckets=[0.1, 0.5, 1, 2, 5, 10, 30, 60]
+)
+
+rag_request_counter = metrics.counter(
+    "rag_requests_total",
+    "Nombre total de requêtes RAG"
+)
+
+rag_cache_hit_counter = metrics.counter(
+    "rag_cache_hits_total",
+    "Nombre total de hits sur le cache RAG"
+)
+
+rag_cache_miss_counter = metrics.counter(
+    "rag_cache_misses_total",
+    "Nombre total de miss sur le cache RAG"
+)
+
+rag_error_counter = metrics.counter(
+    "rag_errors_total",
+    "Nombre total d'erreurs RAG"
+)
 
 class RagService:
     """
@@ -18,11 +53,16 @@ class RagService:
     """
     
     @staticmethod
+    @timed("rag_answer_question_time", "Temps pour répondre à une question")
+    @circuit(name="rag_answer_question", failure_threshold=3, recovery_timeout=60)
     async def answer_question(
         question: str,
-        max_context_items: int = 5,
-        score_threshold: float = 0.7,
-        use_reranking: bool = True
+        max_context_items: int = None,
+        score_threshold: float = None,
+        use_reranking: bool = None,
+        use_llm: bool = True,
+        use_cache: bool = True,
+        user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Répond à une question en utilisant le RAG.
@@ -32,6 +72,9 @@ class RagService:
             max_context_items: Nombre maximum d'éléments à inclure dans le contexte
             score_threshold: Seuil de score minimum pour les résultats de recherche
             use_reranking: Si True, utilise le reranking pour améliorer les résultats
+            use_llm: Si True, utilise un LLM pour générer la réponse
+            use_cache: Si True, utilise le cache pour les réponses
+            user_id: ID de l'utilisateur (pour personnaliser les réponses)
             
         Returns:
             Réponse avec contexte et sources
@@ -39,118 +82,125 @@ class RagService:
         if not question:
             return {"error": "La question ne peut pas être vide"}
         
-        # 1. Recherche sémantique
-        entity_types = ['country', 'team', 'player', 'fixture', 'league', 'coach', 'standing']
-        search_results = await SearchService.search_by_text(
-            text=question,
-            entity_types=entity_types,
-            limit=max_context_items * 2,  # Récupérer plus de résultats pour le reranking
-            score_threshold=score_threshold
-        )
+        # Incrémenter le compteur de requêtes
+        rag_request_counter.inc()
         
-        # 2. Consolidation des résultats
-        consolidated_results = []
-        for entity_type, results in search_results.items():
-            if isinstance(results, list):
-                for result in results:
-                    if 'payload' in result:
-                        # Enrichir le résultat avec le type d'entité
-                        result['entity_type'] = entity_type
-                        consolidated_results.append(result)
+        # Utiliser les valeurs par défaut de configuration si non spécifiées
+        max_context_items = max_context_items or settings.RAG_MAX_CONTEXT_ITEMS
+        score_threshold = score_threshold or settings.RAG_MIN_SCORE_THRESHOLD
+        use_reranking = use_reranking if use_reranking is not None else settings.RAG_USE_RERANKING
         
-        # 3. Reranking (si activé)
-        if use_reranking and consolidated_results:
-            reranked_results = await RagService._rerank_results(question, consolidated_results)
-            # Limiter le nombre de résultats après reranking
-            context_items = reranked_results[:max_context_items]
-        else:
-            # Trier par score de similarité et limiter
-            consolidated_results.sort(key=lambda x: x.get('score', 0), reverse=True)
-            context_items = consolidated_results[:max_context_items]
+        # Vérifier le cache si activé
+        if use_cache:
+            cache_key = f"rag:answer:{hash(question)}:{max_context_items}:{score_threshold}:{use_reranking}:{use_llm}"
+            cached_result = await cache_service.get(cache_key)
+            if cached_result:
+                rag_cache_hit_counter.inc()
+                logger.debug(f"Réponse trouvée dans le cache pour la question: {question[:50]}...")
+                return cached_result
+            rag_cache_miss_counter.inc()
         
-        # 4. Construction du contexte
-        context, sources = RagService._build_context_and_sources(context_items)
+        start_time = time.time()
         
-        # 5. Construction de la réponse
-        answer = RagService._generate_answer(question, context)
-        
-        return {
-            "question": question,
-            "answer": answer,
-            "sources": sources,
-            "context_items_count": len(context_items),
-            "timestamp": datetime.now().isoformat()
-        }
-    
-    @staticmethod
-    async def _rerank_results(
-        question: str,
-        results: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Reranke les résultats de recherche en fonction de leur pertinence pour la question.
-        
-        Args:
-            question: Question posée
-            results: Résultats de la recherche sémantique
+        try:
+            # 1. Recherche sémantique
+            entity_types = ['country', 'team', 'player', 'fixture', 'league', 'coach', 'standing']
+            search_results = await SearchService.search_by_text(
+                text=question,
+                entity_types=entity_types,
+                limit=max_context_items * 2,  # Récupérer plus de résultats pour le reranking
+                score_threshold=score_threshold
+            )
             
-        Returns:
-            Résultats reranked
-        """
-        # Note: Pour un reranking avancé, intégrer un modèle cross-encoder
-        # Ici, nous utilisons une heuristique simplifiée basée sur le type d'entité et le contenu
-        
-        # 1. Identifier les mots clés de la question
-        question_lower = question.lower()
-        keywords = set(question_lower.split())
-        
-        # 2. Calcul d'un score de pertinence pour chaque résultat
-        for result in results:
-            relevance_score = result.get('score', 0)  # Score de similarité initial
+            # 2. Consolidation des résultats
+            consolidated_results = []
+            for entity_type, results in search_results.get("results", {}).items():
+                if isinstance(results, list):
+                    for result in results:
+                        if 'payload' in result:
+                            # Enrichir le résultat avec le type d'entité
+                            result['entity_type'] = entity_type
+                            consolidated_results.append(result)
             
-            # Boosting en fonction du type d'entité (ajuster selon les besoins)
-            entity_boosts = {
-                'player': 1.2,      # Boost pour les joueurs
-                'team': 1.1,        # Boost pour les équipes
-                'fixture': 1.15,    # Boost pour les matchs
-                'league': 1.05,     # Boost pour les ligues
-                'coach': 1.1,       # Boost pour les entraîneurs
-                'standing': 1.0,    # Pas de boost pour les classements
-                'country': 0.9      # Légère pénalité pour les pays
+            # 3. Reranking si activé
+            if use_reranking and consolidated_results:
+                # Utiliser le reranking spécifique au football
+                reranked_results = await reranking_service.rerank(
+                    query=question,
+                    results=consolidated_results,
+                    max_results=max_context_items
+                )
+                context_items = reranked_results
+            else:
+                # Trier par score de similarité et limiter
+                consolidated_results.sort(key=lambda x: x.get('score', 0), reverse=True)
+                context_items = consolidated_results[:max_context_items]
+            
+            # 4. Construction du contexte
+            context, sources = await RagService._build_context_and_sources(context_items)
+            
+            # 5. Analyse de la complexité de la question pour déterminer le modèle à utiliser
+            complexity_analysis = None
+            if use_llm:
+                try:
+                    complexity_analysis = await llm_service.analyze_question_complexity(question)
+                    logger.debug(f"Analyse de complexité: {complexity_analysis}")
+                except Exception as e:
+                    logger.warning(f"Erreur lors de l'analyse de complexité: {str(e)}")
+            
+            # 6. Construction de la réponse
+            if use_llm and llm_service is not None:
+                # Déterminer si on utilise le modèle de raisonnement
+                use_reasoner = complexity_analysis.get("use_reasoner", False) if complexity_analysis else False
+                
+                answer = await llm_service.generate_response(
+                    question=question,
+                    context=context,
+                    use_reasoner=use_reasoner,
+                    max_tokens=settings.OPENAI_MAX_TOKENS
+                )
+            else:
+                # Réponse simple sans LLM
+                answer = RagService._generate_fallback_response(question, context)
+            
+            # 7. Préparation du résultat final
+            result = {
+                "question": question,
+                "answer": answer,
+                "sources": sources,
+                "context_items_count": len(context_items),
+                "processing_time": time.time() - start_time,
+                "timestamp": datetime.now().isoformat()
             }
             
-            entity_type = result.get('entity_type', '')
-            entity_boost = entity_boosts.get(entity_type, 1.0)
+            # Ajouter l'analyse de complexité si disponible
+            if complexity_analysis:
+                result["complexity"] = {
+                    "score": complexity_analysis.get("complexity", 0),
+                    "reasoning_required": complexity_analysis.get("reasoning_required", False),
+                    "reasoning_type": complexity_analysis.get("reasoning_type", "none")
+                }
             
-            # Analyse du contenu pour correspondance avec les mots-clés
-            payload = result.get('payload', {})
-            content_text = ""
+            # Mettre en cache le résultat
+            if use_cache:
+                await cache_service.set(cache_key, result, ttl=settings.CACHE_TTL)
             
-            # Extraire le texte du contenu
-            if 'text_content' in payload:
-                content_text = payload['text_content']
-            elif 'name' in payload:
-                content_text = payload['name']
-            
-            content_lower = content_text.lower()
-            
-            # Compter les occurrences de mots-clés
-            keyword_count = sum(1 for keyword in keywords if keyword in content_lower)
-            keyword_boost = 1 + (keyword_count * 0.05)  # +5% par mot-clé trouvé
-            
-            # Score final combiné
-            final_score = relevance_score * entity_boost * keyword_boost
-            
-            # Mettre à jour le score dans le résultat
-            result['reranked_score'] = final_score
+            return result
         
-        # 3. Trier les résultats par score de pertinence
-        results.sort(key=lambda x: x.get('reranked_score', 0), reverse=True)
-        
-        return results
+        except Exception as e:
+            # Incrémenter le compteur d'erreurs
+            rag_error_counter.inc()
+            
+            logger.error(f"Erreur lors de la réponse à la question '{question}': {str(e)}")
+            return {
+                "question": question,
+                "error": f"Erreur lors de la génération de la réponse: {str(e)}",
+                "processing_time": time.time() - start_time,
+                "timestamp": datetime.now().isoformat()
+            }
     
     @staticmethod
-    def _build_context_and_sources(
+    async def _build_context_and_sources(
         context_items: List[Dict[str, Any]]
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """
@@ -187,7 +237,7 @@ class RagService:
                 "id": payload.get('id'),
                 "type": entity_type,
                 "name": payload.get('name', f"ID:{payload.get('id', 'unknown')}"),
-                "relevance_score": item.get('score') or item.get('reranked_score', 0)
+                "relevance_score": item.get('rerank_score') or item.get('score', 0)
             }
             sources.append(source)
         
@@ -197,9 +247,9 @@ class RagService:
         return full_context, sources
     
     @staticmethod
-    def _generate_answer(question: str, context: str) -> str:
+    def _generate_fallback_response(question: str, context: str) -> str:
         """
-        Génère une réponse à partir de la question et du contexte récupéré.
+        Génère une réponse de secours si le LLM n'est pas disponible.
         
         Args:
             question: Question posée
@@ -208,46 +258,25 @@ class RagService:
         Returns:
             Réponse générée
         """
-        # Note: Dans une implémentation complète, cette méthode utiliserait un LLM.
-        # Pour cette version, nous retournons une réponse formatée qui inclut le contexte.
+        # Version simple de réponse en cas d'indisponibilité du LLM
+        context_summary = context[:500] + "..." if len(context) > 500 else context
         
-        # Dans un système réel, vous intégreriez ici un appel à un LLM comme OpenAI, Claude, etc.
-        # Exemple fictif:
-        # response = openai.ChatCompletion.create(
-        #     model="gpt-4",
-        #     messages=[
-        #         {"role": "system", "content": "You are a football expert assistant..."},
-        #         {"role": "user", "content": f"Question: {question}\n\nContext: {context}"}
-        #     ]
-        # )
-        # return response.choices[0].message.content
-        
-        # Pour cette version simplifiée:
-        answer = f"Voici les informations trouvées en réponse à votre question:\n\n"
-        answer += "Basé sur les données disponibles, "
-        
-        # Analyser le contexte pour générer une réponse simple
-        if "joueur" in question.lower() or "player" in question.lower():
-            answer += "le joueur mentionné "
-        elif "équipe" in question.lower() or "team" in question.lower():
-            answer += "l'équipe mentionnée "
-        elif "match" in question.lower() or "fixture" in question.lower():
-            answer += "le match mentionné "
-        else:
-            answer += "les informations demandées "
-        
-        answer += "sont disponibles dans notre base de connaissances."
-        
-        # Ajouter un message sur l'utilisation d'un LLM dans un système réel
-        answer += "\n\nNote: Dans une implémentation complète, cette réponse serait générée par un LLM en utilisant le contexte récupéré."
+        answer = (
+            "Voici les informations pertinentes que j'ai trouvées en réponse à votre question:\n\n"
+            f"{context_summary}\n\n"
+            "Note: Cette réponse est générée automatiquement à partir des informations disponibles."
+        )
         
         return answer
     
     @staticmethod
+    @timed("rag_entity_details_time", "Temps pour récupérer les détails d'une entité")
+    @circuit(name="rag_entity_details", failure_threshold=3, recovery_timeout=60)
     async def get_entity_details(
         entity_type: str,
         entity_id: int,
-        include_related: bool = True
+        include_related: bool = True,
+        use_cache: bool = True
     ) -> Dict[str, Any]:
         """
         Récupère les détails d'une entité spécifique et les entités associées.
@@ -256,17 +285,27 @@ class RagService:
             entity_type: Type d'entité
             entity_id: ID de l'entité
             include_related: Si True, inclut les entités liées
+            use_cache: Si True, utilise le cache
             
         Returns:
             Détails de l'entité et entités associées
         """
-        from app.db.qdrant.client import get_qdrant_client
-        from app.db.qdrant.collections import get_collection_name
-        
-        collection_name = get_collection_name(entity_type)
-        client = get_qdrant_client()
+        # Vérifier le cache si activé
+        if use_cache:
+            cache_key = f"rag:entity:{entity_type}:{entity_id}:{include_related}"
+            cached_result = await cache_service.get(cache_key)
+            if cached_result:
+                rag_cache_hit_counter.inc()
+                return cached_result
+            rag_cache_miss_counter.inc()
         
         try:
+            from app.db.qdrant.client import get_qdrant_client
+            from app.db.qdrant.collections import get_collection_name
+            
+            collection_name = get_collection_name(entity_type)
+            client = get_qdrant_client()
+            
             # Récupérer l'entité depuis Qdrant
             entity_points = client.retrieve(
                 collection_name=collection_name,
@@ -285,8 +324,7 @@ class RagService:
                 "entity_id": entity_id,
                 "data": entity_data
             }
-            
-            # Récupérer les entités associées si demandé
+# Récupérer les entités associées si demandé
             if include_related:
                 related_entities = await RagService._get_related_entities(entity_type, entity_id, entity_data)
                 result["related_entities"] = related_entities
@@ -300,9 +338,16 @@ class RagService:
                 )
                 result["similar_entities"] = similar_entities
             
+            # Mettre en cache le résultat
+            if use_cache:
+                await cache_service.set(f"rag:entity:{entity_type}:{entity_id}:{include_related}", result, ttl=settings.CACHE_TTL)
+            
             return result
             
         except Exception as e:
+            # Incrémenter le compteur d'erreurs
+            rag_error_counter.inc()
+            
             logger.error(f"Erreur lors de la récupération des détails de l'entité: {str(e)}")
             return {"error": str(e)}
     
@@ -405,10 +450,13 @@ class RagService:
         return related
     
     @staticmethod
+    @timed("rag_analyze_content_time", "Temps d'analyse de contenu")
+    @circuit(name="rag_analyze_content", failure_threshold=3, recovery_timeout=60)
     async def analyze_football_content(
         content: str,
         identify_entities: bool = True,
-        extract_facts: bool = True
+        extract_facts: bool = True,
+        use_llm: bool = True
     ) -> Dict[str, Any]:
         """
         Analyse un contenu textuel lié au football pour identifier les entités et extraire des faits.
@@ -417,6 +465,7 @@ class RagService:
             content: Contenu textuel à analyser
             identify_entities: Si True, identifie les entités mentionnées
             extract_facts: Si True, extrait des faits du contenu
+            use_llm: Si True, utilise un LLM pour l'extraction des faits
             
         Returns:
             Résultats de l'analyse
@@ -445,7 +494,7 @@ class RagService:
                         from app.db.qdrant.collections import get_collection_name
                         
                         collection_name = get_collection_name(entity_type)
-                        search_results = search_collection(
+                        search_results = await search_collection(
                             collection_name=collection_name,
                             query_vector=content_vector,
                             limit=5,
@@ -460,10 +509,38 @@ class RagService:
                 
                 results["identified_entities"] = identified_entities
         
-        # Extraire des faits (dans une version réelle, utiliser un LLM pour cette tâche)
-        if extract_facts:
-            # Simuler l'extraction de faits
-            # Note: Dans une implémentation réelle, utiliser un LLM comme GPT pour cette tâche
+        # Extraire des faits avec un LLM
+        if extract_facts and use_llm and llm_service is not None:
+            try:
+                # Utiliser le LLM pour extraire des faits
+                extraction_prompt = (
+                    "Analyze this football text and extract key facts and insights. "
+                    "Focus on player performances, match results, team statistics, and tactical observations. "
+                    "Return a JSON array of facts with format: [{\"fact\": \"...\", \"category\": \"...\"}]"
+                )
+                
+                extracted_text = await llm_service.generate_response(
+                    question="Extract key football facts from this text",
+                    context=content,
+                    system_prompt=extraction_prompt,
+                    use_reasoner=False
+                )
+                
+                # Tenter de parser le JSON retourné
+                try:
+                    facts = json.loads(extracted_text)
+                    results["extracted_facts"] = facts
+                except json.JSONDecodeError:
+                    # Si le format n'est pas un JSON valide, utiliser le texte brut
+                    results["extracted_facts_text"] = extracted_text
+                    
+            except Exception as e:
+                logger.error(f"Erreur lors de l'extraction des faits: {str(e)}")
+                results["extracted_facts"] = [
+                    "Une erreur s'est produite lors de l'extraction des faits."
+                ]
+        elif extract_facts:
+            # Simulation d'extraction sans LLM
             results["extracted_facts"] = [
                 "Cette fonction simule l'extraction de faits.",
                 "Dans une implémentation réelle, un LLM analyserait le contenu pour identifier les faits importants."
@@ -472,10 +549,13 @@ class RagService:
         return results
     
     @staticmethod
+    @timed("rag_get_football_stats_time", "Temps de récupération des statistiques")
+    @circuit(name="rag_get_football_stats", failure_threshold=3, recovery_timeout=60)
     async def get_football_stats(
         entity_type: str,
         entity_id: int,
-        stat_type: str = None
+        stat_type: str = None,
+        use_cache: bool = True
     ) -> Dict[str, Any]:
         """
         Récupère les statistiques liées au football pour une entité donnée.
@@ -484,6 +564,7 @@ class RagService:
             entity_type: Type d'entité (team, player, league)
             entity_id: ID de l'entité
             stat_type: Type de statistique spécifique (optionnel)
+            use_cache: Si True, utilise le cache
             
         Returns:
             Statistiques formatées
@@ -491,6 +572,15 @@ class RagService:
         # Vérifier les types d'entités supportés
         if entity_type not in ['team', 'player', 'league']:
             return {"error": f"Type d'entité non supporté pour les statistiques: {entity_type}"}
+        
+        # Vérifier le cache si activé
+        if use_cache:
+            cache_key = f"rag:stats:{entity_type}:{entity_id}:{stat_type or 'all'}"
+            cached_result = await cache_service.get(cache_key)
+            if cached_result:
+                rag_cache_hit_counter.inc()
+                return cached_result
+            rag_cache_miss_counter.inc()
         
         # Récupérer l'entité principale
         entity_details = await RagService.get_entity_details(
@@ -639,5 +729,13 @@ class RagService:
                 stats_results["standings"] = formatted_standings
             else:
                 stats_results["message"] = "Aucun classement trouvé pour cette ligue"
+        
+        # Mettre en cache le résultat
+        if use_cache:
+            await cache_service.set(
+                f"rag:stats:{entity_type}:{entity_id}:{stat_type or 'all'}", 
+                stats_results, 
+                ttl=settings.CACHE_TTL
+            )
         
         return stats_results
