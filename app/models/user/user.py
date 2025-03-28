@@ -64,6 +64,7 @@ class UserProfile(Base, TimeStampMixin):
     user = relationship("User", back_populates="profile")
     country = relationship("Country")
     favorite_team = relationship("Team")
+    feedbacks = relationship("UserFeedback", back_populates="user")
     
     def __repr__(self):
         return f"<UserProfile(user_id={self.user_id})>"

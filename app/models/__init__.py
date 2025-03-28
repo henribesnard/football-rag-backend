@@ -29,6 +29,9 @@ from app.models.user.session import UserSession, PasswordReset
 # SYSTEM
 from app.models.system.updatelog import UpdateLog
 
+# FEEDBACK
+from app.models.feedback.feedback import UserFeedback
+
 # Dictionnaire de tous les modèles par type d'entité pour un accès facile
 ENTITY_MODELS = {
     # CORE
@@ -67,6 +70,9 @@ ENTITY_MODELS = {
     
     # SYSTEM
     'update_log': UpdateLog,
+
+    # FEEDBACK
+    'user_feedback': UserFeedback,
 }
 
 # Fonction helper pour obtenir un modèle par type d'entité
