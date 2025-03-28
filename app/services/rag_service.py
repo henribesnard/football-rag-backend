@@ -1,4 +1,3 @@
-# app/services/rag_service.py
 """
 Service RAG (Retrieval-Augmented Generation) pour répondre aux questions sur le football.
 """
